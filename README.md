@@ -10,14 +10,6 @@
 
 ---
 
-## 🌐 Live Demo
-
-**[👉 Try the app here]([https://streamlit.app](https://swasthai-l8sodya4cuhqzplycfdp6c.streamlit.app/))**
-
-No installation needed — runs entirely in the browser.
-
----
-
 ## 📋 Overview
 
 ### The Problem
