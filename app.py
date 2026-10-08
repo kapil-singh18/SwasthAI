@@ -105,9 +105,17 @@ st.markdown(
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
     /* ── Base font for the whole page ── */
-    html, body, [class*="css"] {
+    /* We target only html and body, NOT [class*="css"].
+       That wildcard selector catches Streamlit's internal container class names
+       (e.g. css-1v3fvcr) and can override foreground colours that Streamlit's
+       own layout engine uses as visibility signals, causing blank tab panels. */
+    html, body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         color: #0f172a;
+    }
+    /* Apply font to Streamlit's generic element containers safely */
+    .stMarkdown, .stText, .stCaption, .stHeading {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
     /* ── Hide Streamlit default menu and built-in footer ── */
@@ -117,8 +125,11 @@ st.markdown(
     footer             { visibility: hidden; }
 
     /* ── Page background and top padding ── */
-    .stApp             { background-color: #f8fafc; }
-    .block-container   { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1200px; }
+    /* We set background on .stApp but do NOT set max-width on .block-container
+       because an overly narrow max-width can cause st.columns content to reflow
+       off-screen on Streamlit Cloud's default iframe width. */
+    .stApp           { background-color: #f8fafc; }
+    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 
     /* ── Hero gradient banner ── */
     .hero-banner {
@@ -825,6 +836,471 @@ st.markdown(
 )
 
 
+# Debug marker 1: confirms data and models loaded successfully before tabs render
+st.caption("DEBUG: models trained")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SECTION 10 – MAIN TABS
-# All page co
+# IMPORTANT: st.tabs() AND all with-tab: blocks must be inside the same
+# try/except so that (a) any failure is visible and (b) Streamlit registers
+# tab creation and tab content in the same execution context.
+# ══════════════════════════════════════════════════════════════════════════════
+
+try:
+    # Create the four navigation tabs INSIDE the try block so tab creation
+    # and tab content population happen atomically. If st.tabs() were outside
+    # the try and the with-tab: blocks were inside, the tab panels can be
+    # registered as empty on some Streamlit Cloud builds.
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["🔍 Symptom Checker", "📈 Model Performance", "📊 Data Insights", "ℹ️ About Project"]
+    )
+
+    # Debug marker 2: confirms st.tabs() returned successfully
+    st.caption("DEBUG: tabs created")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 1 – SYMPTOM CHECKER
+    # ─────────────────────────────────────────────────────────────────────────
+    with tab1:
+        # Two equal-width columns: left = inputs, right = results
+        col_input, col_results = st.columns([1, 1], gap="large")
+
+        # ── LEFT COLUMN: symptom checkboxes + patient context ─────────────────
+        with col_input:
+            st.markdown("### 🩹 Select Your Symptoms")
+            st.caption("Check all symptoms you are currently experiencing.")
+
+            # ── General symptoms ──────────────────────────────────────────────
+            st.markdown(
+                '<p class="symptom-group">🌡️ General</p>',
+                unsafe_allow_html=True,
+            )
+            g1a, g1b, g1c = st.columns(3)
+            sel_fever      = g1a.checkbox("Fever")
+            sel_high_fever = g1b.checkbox("High Fever")
+            sel_chills     = g1c.checkbox("Chills")
+            sel_sweating   = g1a.checkbox("Sweating")
+            sel_fatigue    = g1b.checkbox("Fatigue")
+            sel_body_ache  = g1c.checkbox("Body Ache")
+            sel_headache   = g1a.checkbox("Headache")
+            sel_loss_app   = g1b.checkbox("Loss of Appetite")
+
+            # ── Respiratory symptoms ──────────────────────────────────────────
+            st.markdown(
+                '<p class="symptom-group">🫁 Respiratory</p>',
+                unsafe_allow_html=True,
+            )
+            g2a, g2b, g2c = st.columns(3)
+            sel_cough       = g2a.checkbox("Cough")
+            sel_sore_throat = g2b.checkbox("Sore Throat")
+            sel_runny_nose  = g2c.checkbox("Runny Nose")
+            sel_sob         = g2a.checkbox("Shortness of Breath")
+            sel_loss_ts     = g2b.checkbox("Loss of Taste/Smell")
+
+            # ── Digestive symptoms ────────────────────────────────────────────
+            st.markdown(
+                '<p class="symptom-group">🫃 Digestive</p>',
+                unsafe_allow_html=True,
+            )
+            g3a, g3b, g3c = st.columns(3)
+            sel_nausea     = g3a.checkbox("Nausea")
+            sel_vomiting   = g3b.checkbox("Vomiting")
+            sel_diarrhea   = g3c.checkbox("Diarrhoea")
+            sel_abdom_pain = g3a.checkbox("Abdominal Pain")
+
+            # ── Other symptoms ────────────────────────────────────────────────
+            st.markdown(
+                '<p class="symptom-group">🔎 Other</p>',
+                unsafe_allow_html=True,
+            )
+            g4a, g4b, g4c = st.columns(3)
+            sel_rash       = g4a.checkbox("Rash")
+            sel_joint_pain = g4b.checkbox("Joint Pain")
+            sel_light_sens = g4c.checkbox("Light Sensitivity")
+
+            st.divider()
+
+            # ── Patient context ───────────────────────────────────────────────
+            st.markdown("### 👤 Patient Context")
+
+            # Age slider — range 1 to 100 years
+            age = st.slider("Age (years)", min_value=1, max_value=100,
+                            value=30, step=1)
+
+            # Illness duration slider — 1 to 30 days
+            illness_days = st.slider("Days of illness", min_value=1,
+                                     max_value=30, value=3, step=1)
+
+            # ── Map checkbox booleans to the canonical symptom name list ──────
+            # This must match the SYMPTOMS ordering so build_symptom_vector
+            # places each symptom in the correct column position.
+            selected_symptoms: list[str] = []
+            if sel_fever:       selected_symptoms.append("fever")
+            if sel_high_fever:  selected_symptoms.append("high_fever")
+            if sel_cough:       selected_symptoms.append("cough")
+            if sel_sore_throat: selected_symptoms.append("sore_throat")
+            if sel_runny_nose:  selected_symptoms.append("runny_nose")
+            if sel_headache:    selected_symptoms.append("headache")
+            if sel_body_ache:   selected_symptoms.append("body_ache")
+            if sel_fatigue:     selected_symptoms.append("fatigue")
+            if sel_nausea:      selected_symptoms.append("nausea")
+            if sel_vomiting:    selected_symptoms.append("vomiting")
+            if sel_diarrhea:    selected_symptoms.append("diarrhea")
+            if sel_abdom_pain:  selected_symptoms.append("abdominal_pain")
+            if sel_rash:        selected_symptoms.append("rash")
+            if sel_joint_pain:  selected_symptoms.append("joint_pain")
+            if sel_chills:      selected_symptoms.append("chills")
+            if sel_loss_ts:     selected_symptoms.append("loss_of_taste_smell")
+            if sel_sob:         selected_symptoms.append("shortness_of_breath")
+            if sel_sweating:    selected_symptoms.append("sweating")
+            if sel_light_sens:  selected_symptoms.append("light_sensitivity")
+            if sel_loss_app:    selected_symptoms.append("loss_of_appetite")
+
+            # Show a live count of selected symptoms
+            st.caption(f"✅ {len(selected_symptoms)} symptom(s) selected")
+
+            # The primary action button — no use_container_width (styled full-width via CSS)
+            analyse_clicked = st.button("🔍 Analyse Symptoms")
+
+        # ── RIGHT COLUMN: safety warnings + prediction results ────────────────
+        with col_results:
+            if not analyse_clicked:
+                # Placeholder card shown before the user runs analysis.
+                # This is a single, self-contained HTML block — no split divs.
+                st.markdown(
+                    """
+                    <div class="swai-card" style="text-align:center;padding:2.5rem 1.5rem;">
+                        <div style="font-size:2.8rem;">🩺</div>
+                        <h3 style="margin-top:0.8rem;text-align:center;">Ready to Analyse</h3>
+                        <p style="color:#64748b;font-size:0.86rem;text-align:center;">
+                            Select your symptoms on the left and click
+                            <strong>Analyse Symptoms</strong> to see results.
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                # ── Safety rule evaluation ────────────────────────────────────
+                # high_fever_days is illness_days only when high fever is ticked
+                hf_days = illness_days if "high_fever" in selected_symptoms else 0
+                warnings_out = safety_check(selected_symptoms, hf_days)
+
+                # Render each warning as its own self-contained HTML block
+                for w in warnings_out:
+                    css_cls = "urgent-banner" if w["urgent"] else "risk-banner"
+                    st.markdown(
+                        f'<div class="{css_cls}">{w["message"]}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                # Only run the model if at least one symptom is ticked
+                if len(selected_symptoms) > 0:
+                    # Build the binary feature vector in training column order
+                    X_input = build_symptom_vector(selected_symptoms)
+
+                    # predict_proba returns shape (1, n_classes); take the first row
+                    proba = rf_model.predict_proba(X_input)[0]
+
+                    # Zip class names to their probabilities, sort descending
+                    class_probs = dict(zip(rf_model.classes_, proba))
+                    top3 = sorted(
+                        class_probs.items(), key=lambda kv: kv[1], reverse=True
+                    )[:3]
+
+                    st.markdown("### 📋 Top 3 Likely Conditions")
+                    st.caption("Based on reported symptoms. Not a diagnosis.")
+
+                    # Render one card + progress bar per top condition
+                    for rank, (condition, prob) in enumerate(top3):
+                        pct       = round(prob * 100, 1)
+                        bc        = badge_class(prob)
+                        bl        = badge_label(prob)
+                        top_cls   = "result-card top-result" if rank == 0 else "result-card"
+                        crown     = "🥇 " if rank == 0 else ""
+                        info      = CONDITION_INFO.get(condition, {})
+                        desc      = info.get("description", "")
+                        self_care = info.get("self_care", "")
+                        see_doc   = info.get("see_doctor", "")
+
+                        # Each result card is a single self-contained HTML block
+                        st.markdown(
+                            f"""
+                            <div class="{top_cls}">
+                                <div style="display:flex;justify-content:space-between;
+                                            align-items:center;margin-bottom:0.3rem;">
+                                    <h4>{crown}{condition}</h4>
+                                    <span class="badge {bc}">{bl} &middot; {pct}%</span>
+                                </div>
+                                <p>{desc}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                        # Native Streamlit progress bar (accepts float 0.0–1.0)
+                        st.progress(prob)
+
+                        # Expandable self-care advice below the card
+                        with st.expander(f"💡 Self-care & advice — {condition}"):
+                            st.markdown(f"**🏠 Self-care:** {self_care}")
+                            st.markdown(f"**🏥 When to see a doctor:** {see_doc}")
+                            st.info(
+                                "⚠️ This is NOT a diagnosis. Please consult "
+                                "a qualified medical professional."
+                            )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 2 – MODEL PERFORMANCE
+    # ─────────────────────────────────────────────────────────────────────────
+    with tab2:
+        st.markdown("## 📈 Model Performance")
+        st.caption("Training and evaluation results on 1 200 synthetic patients.")
+
+        # ── Model comparison table ────────────────────────────────────────────
+        # Using st.container() + st.markdown for structure avoids split-div bugs
+        with st.container():
+            st.markdown("### 🏆 Model Comparison")
+            st.markdown(
+                "Three classifiers are trained and compared. "
+                "**Random Forest** is selected as the final model because it "
+                "achieves the highest accuracy and is robust to overfitting "
+                "via ensemble averaging."
+            )
+            # st.dataframe with use_container_width is the stable API
+            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── Random Forest evaluation metrics as styled stat cards ─────────────
+        st.markdown("### 🌲 Random Forest — Final Model Metrics")
+
+        # Four equal columns for the four metric cards
+        m1, m2, m3, m4 = st.columns(4)
+
+        # Each metric card is a single self-contained HTML block
+        with m1:
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="metric-value">{rf_metrics["accuracy"]:.1%}</div>'
+                f'<div class="metric-label">Accuracy</div></div>',
+                unsafe_allow_html=True,
+            )
+        with m2:
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="metric-value">{rf_metrics["precision"]:.1%}</div>'
+                f'<div class="metric-label">Precision (weighted)</div></div>',
+                unsafe_allow_html=True,
+            )
+        with m3:
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="metric-value">{rf_metrics["recall"]:.1%}</div>'
+                f'<div class="metric-label">Recall (weighted)</div></div>',
+                unsafe_allow_html=True,
+            )
+        with m4:
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="metric-value">{rf_metrics["f1"]:.1%}</div>'
+                f'<div class="metric-label">F1 Score (weighted)</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.divider()
+
+        # ── Feature importances ───────────────────────────────────────────────
+        st.markdown("### 🔑 Top 10 Feature Importances")
+        st.markdown(
+            "Feature importance = mean decrease in node impurity across all 200 trees. "
+            "Higher value → symptom contributes more to predictions."
+        )
+        # Bar chart using Symptom as the index
+        chart_df = feat_imp_df.set_index("Symptom")["Importance"]
+        st.bar_chart(chart_df, use_container_width=True)
+        # Table for exact values
+        st.dataframe(feat_imp_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── Confusion matrix ──────────────────────────────────────────────────
+        st.markdown("### 🗂️ Confusion Matrix (Test Set)")
+        st.markdown(
+            "Rows = true condition, Columns = predicted condition. "
+            "Diagonal cells are correct predictions."
+        )
+        st.dataframe(conf_df, use_container_width=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 3 – DATA INSIGHTS
+    # ─────────────────────────────────────────────────────────────────────────
+    with tab3:
+        st.markdown("## 📊 Data Insights")
+        st.caption("Exploratory analysis of the synthetic dataset.")
+
+        # ── Class balance ─────────────────────────────────────────────────────
+        st.markdown("### ⚖️ Class Balance")
+        st.markdown(
+            "Each condition starts with exactly 150 patients. After 5 % noise "
+            "injection the counts are approximately equal, giving a balanced "
+            "dataset that prevents the model from favouring any single condition."
+        )
+        class_counts = df["condition"].value_counts().sort_index()
+        st.bar_chart(class_counts, use_container_width=True)
+
+        st.divider()
+
+        # ── Symptom frequency per condition ───────────────────────────────────
+        st.markdown("### 🔬 Symptom Frequency per Condition")
+        st.markdown(
+            "Each cell shows the proportion of patients in that condition who "
+            "had the symptom. Darker blue = higher prevalence."
+        )
+
+        # Compute condition × symptom mean prevalence table
+        freq_df = df.groupby("condition")[SYMPTOMS].mean().round(2)
+
+        # Render as a custom colour-coded HTML table.
+        # We use our own freq_table_html() function instead of
+        # DataFrame.style.background_gradient() to avoid the matplotlib
+        # dependency and the pandas 3 Styler incompatibilities.
+        st.markdown(freq_table_html(freq_df), unsafe_allow_html=True)
+
+        st.divider()
+
+        # ── Raw dataset sample ────────────────────────────────────────────────
+        st.markdown("### 🗃️ Dataset Sample (first 20 rows)")
+        st.dataframe(df.head(20), use_container_width=True, hide_index=True)
+        st.caption(
+            f"Total rows: {len(df)}  |  "
+            f"Features: {len(SYMPTOMS)} symptoms  |  "
+            f"Classes: {df['condition'].nunique()}"
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # TAB 4 – ABOUT PROJECT
+    # ─────────────────────────────────────────────────────────────────────────
+    with tab4:
+        st.markdown("## ℹ️ About This Project")
+
+        # Each card is a single, self-contained st.markdown block.
+        # No open/close tags are split across separate calls.
+        st.markdown(
+            """
+            <div class="swai-card">
+            <h3>🎯 Project Goal</h3>
+            <p>
+                This application demonstrates how machine learning can support early
+                disease screening in resource-limited settings, directly supporting
+                <strong>UN Sustainable Development Goal 3</strong>: Good Health and
+                Well-being. It is built as an educational tool to illustrate the full
+                ML lifecycle — data generation, exploration, training, evaluation and
+                real-time inference — using only open-source Python libraries.
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+            <div class="swai-card">
+            <h3>🤖 Algorithm Plain-English Guide</h3>
+
+            <p><strong>🌲 Random Forest</strong><br>
+            Imagine asking 200 doctors (each trained on a slightly different patient
+            subset) to vote on a diagnosis. The majority vote wins. Because each
+            doctor sees different data, their errors are uncorrelated and cancel out —
+            this is <em>ensemble averaging</em>. Random Forest also randomly selects a
+            subset of symptoms at each split, further decorrelating the trees.</p>
+
+            <p><strong>🌿 Decision Tree</strong><br>
+            A single doctor who asks yes/no questions
+            ("Does the patient have high fever? → Yes → Do they have chills?…")
+            until reaching a diagnosis. Easy to interpret, but a single tree can
+            memorise training data (overfit) if not depth-limited.</p>
+
+            <p><strong>📐 Logistic Regression</strong><br>
+            Draws a straight boundary in symptom space and converts the signed
+            distance to that boundary into a probability via the sigmoid function.
+            Fast and interpretable, but struggles when illnesses are not linearly
+            separable.</p>
+
+            <p><strong>✂️ Train/Test Split</strong><br>
+            We reserve 20 % of patients the model never saw during training.
+            Similar accuracy on both sets means the model generalises well.</p>
+
+            <p><strong>🔄 Cross-Validation (5-fold)</strong><br>
+            The training set is cut into 5 equal slices. We train on 4 and test
+            on 1, rotating 5 times, then average the 5 scores. This gives a
+            lower-variance generalisation estimate than a single split.</p>
+
+            <p><strong>📏 Accuracy, Precision, Recall, F1</strong><br>
+            <em>Accuracy</em> = fraction of all predictions that are correct.<br>
+            <em>Precision</em> = of all times we predicted "Dengue", how often were we right?<br>
+            <em>Recall</em> = of all actual Dengue cases, how many did we catch?<br>
+            <em>F1</em> = 2 × (Precision × Recall) / (Precision + Recall) — balances both.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+            <div class="swai-card">
+            <h3>🛠️ Technology Stack</h3>
+            <ul>
+                <li><strong>Streamlit</strong> — interactive web UI framework</li>
+                <li><strong>scikit-learn</strong> — Random Forest, Decision Tree, Logistic Regression</li>
+                <li><strong>NumPy</strong> — numerical array operations and random sampling</li>
+                <li><strong>Pandas</strong> — tabular data manipulation and analysis</li>
+            </ul>
+            <p style="font-size:0.84rem;color:#64748b;">
+                No external files, no API keys, no CSV downloads required.<br>
+                Run with: <code>streamlit run app.py</code>
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            """
+            <div class="swai-card">
+            <h3>🌍 SDG 3 Alignment</h3>
+            <p>
+                SDG 3 aims to <em>"ensure healthy lives and promote well-being for
+                all at all ages."</em> AI-assisted screening tools can improve early
+                detection in communities with limited specialist access, reduce
+                diagnostic delay, and help individuals make informed decisions about
+                seeking professional care — while keeping the human doctor firmly
+                in the loop as the final decision-maker.
+            </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+# Catch any runtime error and display it visibly instead of a blank white page
+except Exception as e:
+    st.error("⚠️ An unexpected error occurred while rendering the app.")
+    st.exception(e)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 11 – PERMANENT FOOTER DISCLAIMER
+# Rendered outside the tabs so it appears on every tab.
+# ══════════════════════════════════════════════════════════════════════════════
+
+st.markdown(
+    """
+    <div class="footer-disclaimer">
+        🩺 <strong>SwasthAI</strong> — Educational project using synthetic data.
+        Not a medical diagnosis. &nbsp;|&nbsp;
+        Always consult a qualified healthcare professional. &nbsp;|&nbsp;
+        Aligned with <strong>UN SDG 3</strong>: Good Health &amp; Well-being.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
