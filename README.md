@@ -12,7 +12,7 @@
 
 ## 🌐 Live Demo
 
-**[👉 Try the app here]([https://[paste-your-streamlit-app-link](https://swasthai-l8sodya4cuhqzplycfdp6c.streamlit.app/)])**
+**[👉 Try the app here](https://[paste-your-streamlit-app-link](https://swasthai-l8sodya4cuhqzplycfdp6c.streamlit.app/)])**
 
 No installation needed — runs entirely in the browser.
 
