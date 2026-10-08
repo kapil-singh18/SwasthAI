@@ -12,7 +12,7 @@
 
 ## 🌐 Live Demo
 
-**[👉 Try the app here](https://[paste-your-streamlit-app-link])**
+**[👉 Try the app here]([https://[paste-your-streamlit-app-link](https://swasthai-l8sodya4cuhqzplycfdp6c.streamlit.app/)])**
 
 No installation needed — runs entirely in the browser.
 
@@ -113,31 +113,18 @@ When the user clicks **Analyse Symptoms**, the selected symptom checkboxes are c
 
 | Metric | Score |
 |---|---|
-| Accuracy | [ACCURACY] |
-| Precision (weighted) | [PRECISION] |
-| Recall (weighted) | [RECALL] |
-| F1 Score (weighted) | [F1] |
+| Accuracy | 83.8% |
+| Precision (weighted) | 84.8% |
+| Recall (weighted) | 83.8% |
+| F1 Score (weighted) | 83.9% |
 
 ### Three-Model Comparison
 
 | Model | Test Accuracy | 5-Fold CV Mean Accuracy |
 |---|---|---|
-| Random Forest (200 trees) | [RF_TEST_ACC] | [RF_CV_ACC] |
-| Decision Tree (depth 8) | [DT_TEST_ACC] | [DT_CV_ACC] |
-| Logistic Regression | [LR_TEST_ACC] | [LR_CV_ACC] |
-
----
-
-## 📸 Screenshots
-
-### Symptom Checker
-![Symptom Checker](screenshots/checker.png)
-
-### Prediction Results
-![Results](screenshots/results.png)
-
-### Model Performance
-![Model Performance](screenshots/performance.png)
+| Random Forest (200 trees) | 0.838 | 0.864 |
+| Decision Tree (depth 8) | 0.767 | 0.727 |
+| Logistic Regression | 0.850 | 0.881 |
 
 ---
 
@@ -216,8 +203,8 @@ scikit-learn
 
 ## 👤 Author & Acknowledgements
 
-**[Your Name]**
-[Your College]
+**Kapil Singh Songare**
+University institute of technology, RGPV Bhopal, M.P.
 IBM SkillsBuild Machine Learning & AI Internship
 Edunet Foundation / AICTE
 
